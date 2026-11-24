@@ -139,6 +139,29 @@ class TestClosedShellMoldenPayload:
         assert int(occ_cs.sum()) == 10
 
 
+class TestMoldenEcpDefault:
+    """Without --basis, --source molden and molden-direct attach the same
+    ECP (the cc-* family) to the elements beyond Kr of a Molden file."""
+
+    def test_both_molden_modes_attach_the_same_ecp(self, tmp_path):
+        from pyscf import gto, scf
+        from pyscf.tools import molden as pyscf_molden
+        from conftest import MEMORY, THREADS
+        from pyscf_dft import dft_from_molden, reference_from_molden
+        mol = gto.M(atom="H 0 0 0; I 0 0 1.61", basis="def2-svp",
+                    ecp="def2-svp", verbose=0)
+        src = tmp_path / "hi.molden"
+        pyscf_molden.from_scf(scf.RHF(mol).run(), str(src))
+        refit = dft_from_molden(src, functional="hf", threads=THREADS, memory=MEMORY,
+                                restricted=False, closed_shell=True)
+        direct = reference_from_molden(src, threads=THREADS, memory=MEMORY,
+                                       closed_shell=True)
+        for m in (refit.mol, direct.mol):
+            assert sum(m.atom_nelec_core(i) for i in range(m.natm)) == 28
+            assert m.nelectron == mol.nelectron and m.charge == 0
+        assert refit.mol._ecp == direct.mol._ecp
+
+
 class TestMoldenErrorHandling:
 
     def test_single_spin_molden_rejected(self, tmp_path):

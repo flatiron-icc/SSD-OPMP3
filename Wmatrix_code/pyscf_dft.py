@@ -35,8 +35,15 @@ from pyscf_orbitals import (
 )
 from workflow_common import WorkflowPaths, derive_output_paths, read_xyz
 
-# ECP family for molden-direct without --basis (the AO basis is the file's).
+# ECP family for the Molden modes (molden, molden-direct) without --basis;
+# their AO basis is the file's.
 _DEFAULT_ECP_BASIS_HINT = "cc-pvdz"
+
+
+def _molden_ecp_hint(basis: str | None) -> str:
+    """The label that selects the ECP of a Molden input (get_ecp): --basis,
+    or the cc-* family without it.  Shared by both Molden modes."""
+    return basis if basis else _DEFAULT_ECP_BASIS_HINT
 
 _THREAD_ENV_VARS = (
     "OMP_NUM_THREADS",
@@ -219,7 +226,8 @@ def dft_from_molden(
 ):
     """Converged RKS (``closed_shell``), ROKS (``restricted``) or UKS,
     restarted from the orbitals of a Molden file.  The AO basis comes from
-    the file; ``basis`` only selects the ECP."""
+    the file; ``basis`` only selects the ECP family, as in
+    reference_from_molden (_molden_ecp_hint; default cc-*)."""
     _set_threads(threads)
 
     molden_path = Path(molden_file).resolve()
@@ -235,7 +243,7 @@ def dft_from_molden(
             (_, _), (coeff_a, coeff_b), (occ_a, occ_b) = require_unrestricted_molden_payload(
                 mo_energy, mo_coeff, mo_occ,
             )
-        build_with_ecp(mol, basis)
+        build_with_ecp(mol, _molden_ecp_hint(basis))
         if closed_shell:
             charge = infer_charge_from_restricted_occ(mol, occ)
             mol.spin = 0
@@ -347,9 +355,10 @@ def get_ecp(basis, mol=None):
 
 
 def handle_basis_core(basis, mol=None):
-    """Per-element basis for a basis label: H and He get ``cc-pvXz`` for
-    ``cc-pcvXz``/``cc-pwcvXz``, and a ``-pp`` suffix is kept only for the
-    elements beyond Kr.  A non-string basis is returned unchanged."""
+    """Per-element basis for a basis label, lowercased: H and He get
+    ``cc-pvXz`` for ``cc-pcvXz``/``cc-pwcvXz``, and a ``-pp`` suffix is kept
+    only for the elements beyond Kr.  A non-string basis is returned
+    unchanged."""
     if isinstance(basis, str):
         pp_basis = basis.lower()
         basis = basis.lower().replace("z-pp", "z")
@@ -502,14 +511,14 @@ def reference_from_molden(
     (require_closed_shell_molden_payload,
     require_restricted_open_shell_molden_payload); semicanonical orbitals
     pass.  A restricted open-shell file read as UHF gives the same numbers.
-    ``basis`` only selects the ECP family (get_ecp; default cc-*), as the AO
-    basis comes from the file.
+    ``basis`` only selects the ECP family, as in dft_from_molden
+    (_molden_ecp_hint; default cc-*), as the AO basis comes from the file.
     """
     _set_threads(threads)
 
     molden_path = Path(molden_file).resolve()
     mol, mo_energy, mo_coeff, mo_occ, _, _ = molden.load(str(molden_path))
-    build_with_ecp(mol, basis if basis else _DEFAULT_ECP_BASIS_HINT)
+    build_with_ecp(mol, _molden_ecp_hint(basis))
 
     nao = int(mol.nao_nr())
     if closed_shell:

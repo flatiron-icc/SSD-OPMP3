@@ -1,0 +1,7 @@
+# Python bytecode and the pytest cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runs of the test suite (tests/conftest.py recreates this directory each session)
+Wmatrix_code/tests/_runs/

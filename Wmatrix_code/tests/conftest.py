@@ -5,8 +5,8 @@ shell, density fitting, field, frozen core, basis); ALL_VARIANTS lists
 them and the parameter lists below are filtered from it.
 
 The ``run`` fixture does one Q-Chem SCF per (molecule, functional,
-restricted, basis) and restarts every variant of it from that Molden with
-``--source molden``.  Without Q-Chem on PATH the SCF is done by PySCF
+restricted, basis), which is that base variant's run, and restarts every
+other variant of it from that Molden with ``--source molden``.  Without Q-Chem on PATH the SCF is done by PySCF
 instead, and the ``qchem`` tests are skipped.
 
 A closed-shell variant must reproduce its unrestricted twin (the same
@@ -39,7 +39,9 @@ if str(_ROOT) not in sys.path:
 
 from electric_field import parse_electric_field
 from workflow import run_one_workflow
-from workflow_common import WorkflowConfig, ResultFileKey, derive_output_paths
+from workflow_common import (
+    W2_LABELS, W3_LABELS, WorkflowConfig, ResultFileKey, derive_output_paths,
+)
 
 # ---------------------------------------------------------------------------
 # Paths and constants
@@ -337,6 +339,31 @@ def load_reference(mol: str, functional: str, tag: str, basis: str = BASIS) -> d
     if path.is_file():
         return json.loads(path.read_text(encoding="utf-8"))
     return None
+
+
+# ---------------------------------------------------------------------------
+# Orbital-invariant views of a run (W elements depend on orbital phases and
+# degenerate rotations; these do not)
+# ---------------------------------------------------------------------------
+def w_matrices(paths) -> dict[str, np.ndarray]:
+    """The eight saved W matrices of a run, by label."""
+    return {lbl: np.load(paths.w_matrix(lbl)) for lbl in W2_LABELS + W3_LABELS}
+
+
+def singular_values(m: np.ndarray) -> np.ndarray:
+    """Singular values of a W block, descending (empty for a 0x0 block)."""
+    return np.linalg.svd(m, compute_uv=False) if m.size else np.zeros(0)
+
+
+def resummed_totals(result) -> dict[str, float]:
+    """OP-MP3, SOP-MP3 and SSD-OPMP3 total energies of a run summary; the
+    SSD-OPMP3 label carries its x_ss, so it is found by prefix."""
+    e = result.energies
+    ssd = [k for k in e if k.startswith("SSD-OPMP3 total energy")]
+    assert len(ssd) == 1, ssd
+    return {"OP-MP3": e["OP-MP3 total energy"],
+            "SOP-MP3": e["SOP-MP3 total energy"],
+            "SSD-OPMP3": e[ssd[0]]}
 
 
 # ---------------------------------------------------------------------------

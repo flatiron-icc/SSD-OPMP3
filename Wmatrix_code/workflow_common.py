@@ -24,8 +24,32 @@ SCF_SOURCES       = ("qchem", "molden", "chk", "pyscf")
 W2_LABELS = ("W2alpha_ss", "W2alpha_os", "W2beta_ss", "W2beta_os")
 W3_LABELS = ("W3alpha_ss", "W3alpha_os", "W3beta_ss", "W3beta_os")
 
-# Same-spin scaling x_ss of SSD-OPMP3 (the paper's Eq. 22); default 0.5.
-SSD_X_SS = 0.5
+# Same-spin scaling x_ss of the indicative SSD-OPMP3 energy (the paper's
+# Eq. 22) in the run summary: the value the paper fits for the reference
+# (Fig. 3; W4-17 TAE nonMR), looked up by --functional with case, '-', '_'
+# and spaces ignored and 'ω' read as 'w', and DEFAULT_X_SS otherwise.  kappa-OOMP2 (0.45) enters
+# through molden-direct, without --functional, so it gets the default.
+# analysis_code/ evaluates SSD-OPMP3 at any x_ss.
+PAPER_X_SS = {
+    "hf":     0.00,
+    "spw92":  0.75,
+    "pbe":    0.70,
+    "r2scan": 0.60,
+    "pbe0":   0.50,
+    "wb97xv": 0.50,
+    "wb97mv": 0.50,
+}
+DEFAULT_X_SS = 0.5
+
+
+def ssd_x_ss(functional: str | None) -> tuple[float, str]:
+    """(x_ss, where it comes from) of the summary's SSD-OPMP3 energy."""
+    if not functional:
+        return DEFAULT_X_SS, "default: no --functional, orbitals read from a Molden file"
+    key = "".join(c for c in functional.lower().replace("ω", "w") if c not in "-_ ")
+    if key in PAPER_X_SS:
+        return PAPER_X_SS[key], f"fitted in the paper for {functional}, Fig. 3"
+    return DEFAULT_X_SS, f"default: the paper fits no x_ss for {functional}"
 
 
 class ResultFileKey(str, Enum):
@@ -111,7 +135,8 @@ class BatchPaths:
 @dataclass
 class WorkflowResult:
     """One finished run: output paths (by ResultFileKey), W-matrix paths
-    (by label) and the summary energies."""
+    (by label), the summary energies, and the (x_ss, origin) of the
+    summary's SSD-OPMP3 energy."""
     input_path:     Path
     source:         str
     electric_field: ElectricField | None
@@ -119,6 +144,7 @@ class WorkflowResult:
     files:          dict   # ResultFileKey -> str
     w_matrix_files: dict   # str label -> str path
     energies:       dict   # str -> float
+    ssd_x_ss:       tuple[float, str] | None = None   # ssd_x_ss() of the run
 
 
 # ---------------------------------------------------------------------------
@@ -177,30 +203,34 @@ def read_xyz(xyz_file: str | Path) -> tuple[int, int, str]:
 
 
 def derive_output_paths(input_path: str | Path) -> WorkflowPaths:
-    """Return the deterministic output file layout for one input file."""
-    path = Path(input_path).resolve()
-    base = path.with_suffix("")
+    """Return the deterministic output file layout for one input file: the
+    input's path without its extension, plus a suffix.  The suffix is
+    appended, not set with with_suffix(), which would replace the last
+    dotted part of a stem such as h2o.opt."""
+    base = Path(input_path).resolve().with_suffix("")
+    out  = lambda suffix: Path(f"{base}{suffix}")
     return WorkflowPaths(
         base=base,
-        final_output=base.with_suffix(".final.out"),
-        final_yaml=base.with_suffix(".final.yaml"),
-        qchem_input=base.with_suffix(".in"),
-        qchem_output=base.with_suffix(".out"),
-        qchem_molden=base.with_suffix(".molden"),
-        pyscf_output=base.with_suffix(".pyscf.out"),
-        pyscf_chk=base.with_suffix(".pyscf.chk"),
-        pyscf_molden=base.with_suffix(".pyscf.molden"),
-        semicanonical_output=base.with_suffix(".semicanonical.out"),
-        semicanonical_molden=base.with_suffix(".semicanonical.molden"),
+        final_output=out(".final.out"),
+        final_yaml=out(".final.yaml"),
+        qchem_input=out(".in"),
+        qchem_output=out(".out"),
+        qchem_molden=out(".molden"),
+        pyscf_output=out(".pyscf.out"),
+        pyscf_chk=out(".pyscf.chk"),
+        pyscf_molden=out(".pyscf.molden"),
+        semicanonical_output=out(".semicanonical.out"),
+        semicanonical_molden=out(".semicanonical.molden"),
     )
 
 
 def derive_batch_paths(input_path: str | Path) -> BatchPaths:
-    """Return the captured-output paths for one directory-mode child job."""
+    """Return the captured-output paths for one directory-mode child job
+    (suffixes appended, as in derive_output_paths)."""
     base = Path(input_path).resolve().with_suffix("")
     return BatchPaths(
-        stdout=base.with_suffix(".batch.stdout"),
-        stderr=base.with_suffix(".batch.stderr"),
+        stdout=Path(f"{base}.batch.stdout"),
+        stderr=Path(f"{base}.batch.stderr"),
     )
 
 
@@ -349,7 +379,8 @@ def correlation_energy_map(
         "MP3 total energy":                         ref_energy + mp2_corr + mp3_corr,
         "OP-MP3 total energy":                      ref_energy + nbs + w_results["OP-MP3"],
         "SOP-MP3 total energy":                     ref_energy + nbs + w_results["SOP-MP3"],
-        f"SSD-OPMP3 total energy (x_ss = {SSD_X_SS})": ref_energy + nbs + w_results["SSD-OPMP3"],
+        f"SSD-OPMP3 total energy (x_ss = {w_results['SSD-OPMP3 x_ss']:g})":
+            ref_energy + nbs + w_results["SSD-OPMP3"],
     }
 
 
@@ -375,6 +406,9 @@ def _get_scalar_items(result: WorkflowResult, df_auxbasis: str | None = None) ->
         ("Frozen core orbitals", result.ncore),
         ("PySCF version",        _pyscf_version()),
     ]
+    if result.ssd_x_ss is not None:
+        x_ss, origin = result.ssd_x_ss
+        scalar_items.append(("SSD-OPMP3 x_ss", f"{x_ss:g} ({origin})"))
     scalar_items.extend((label.value, path) for label, path in result.files.items())
     scalar_items.extend((label, path) for label, path in result.w_matrix_files.items())
     if df_auxbasis is not None:

@@ -27,7 +27,7 @@ from pyscf_dft import handle_basis_core
 from workflow_common import (
     W2_LABELS,
     W3_LABELS,
-    SSD_X_SS,
+    DEFAULT_X_SS,
     SemicanonicalResult,
     WorkflowPaths,
     derive_output_paths,
@@ -139,10 +139,11 @@ def _zero_w_matrices(nact_a: int, nact_b: int) -> dict[str, np.ndarray]:
             for label, n in zip(labels, (nact_a, nact_a, nact_b, nact_b))}
 
 
-def _save_results(paths: WorkflowPaths, matrices: dict[str, np.ndarray]) -> dict:
+def _save_results(paths: WorkflowPaths, matrices: dict[str, np.ndarray],
+                  x_ss: float = DEFAULT_X_SS) -> dict:
     """Write the eight W matrices to .npy; return their paths, the same-spin,
     opposite-spin and total traces of W2 and W3, and the OP-MP3, SOP-MP3 and
-    SSD-OPMP3 correlation energies."""
+    SSD-OPMP3 (at x_ss) correlation energies."""
     files: dict[str, str] = {}
     for label, matrix in matrices.items():
         np.save(paths.w_matrix(label), matrix)
@@ -160,7 +161,8 @@ def _save_results(paths: WorkflowPaths, matrices: dict[str, np.ndarray]) -> dict
 
     out["OP-MP3"] = pade(["ss", "os"])                          # Eq. 14
     out["SOP-MP3"] = pade(["ss"]) + pade(["os"])                # Eq. 21
-    out["SSD-OPMP3"] = pade(["ss"], SSD_X_SS) + pade(["os"])    # Eq. 22
+    out["SSD-OPMP3"] = pade(["ss"], x_ss) + pade(["os"])        # Eq. 22
+    out["SSD-OPMP3 x_ss"] = float(x_ss)
     return out
 
 
@@ -178,9 +180,11 @@ def run_pyscf_w_matrices(
     auxbasis:      str | None = None,
     memory:        int = 16000,
     output_paths:  WorkflowPaths | None = None,
+    x_ss:          float = DEFAULT_X_SS,
 ) -> dict:
     """Compute and save the W2 and W3 matrices, each (nact, nact) over the
-    occupied orbitals of its spin that are not among the ncore frozen ones.
+    occupied orbitals of its spin that are not among the ncore frozen ones;
+    ``x_ss`` is that of the returned SSD-OPMP3 energy.
     """
     ncore = int(ncore)
     if ncore < 0:
@@ -202,7 +206,7 @@ def run_pyscf_w_matrices(
         )
 
     if nact_a + nact_b < 2:
-        return _save_results(paths, _zero_w_matrices(nact_a, nact_b))
+        return _save_results(paths, _zero_w_matrices(nact_a, nact_b), x_ss)
 
     with open(paths.pyscf_output, "a", encoding="utf-8", buffering=1) as log_fh:
         w = _compute_w(
@@ -211,4 +215,4 @@ def run_pyscf_w_matrices(
             log_fh=log_fh,
         )
 
-    return _save_results(paths, w)
+    return _save_results(paths, w, x_ss)

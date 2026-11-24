@@ -178,7 +178,8 @@ class TestClosedShellCorrIntegration:
         "MP3 total energy",
     ])
     def test_energy_matches_unrestricted_twin(self, v, key, run):
-        """An error in the closed-shell W assembly is only caught here."""
+        """Traces of the closed-shell W assembly; test_invariants.py also
+        compares every block with the twin and with an independent evaluation."""
         result_cs, _ = run(v)
         result_u,  _ = run(v.unrestricted_twin())
         diff = abs(result_cs.energies[key] - result_u.energies[key])

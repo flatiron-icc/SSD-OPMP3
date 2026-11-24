@@ -27,6 +27,7 @@ from workflow_common import (
     emit_result,
     list_inputs,
     resolve_frozen_core,
+    ssd_x_ss,
     suggested_default_workers,
     w_matrix_file_map,
 )
@@ -147,7 +148,7 @@ def run_one_workflow(config: WorkflowConfig) -> WorkflowResult:
             restricted=config.restricted,
             electric_field=config.electric_field,
             output_paths=paths,
-            basis=str(config.basis),
+            basis=config.basis,
             closed_shell=config.closed_shell,
         )
     elif config.source == "molden":
@@ -159,7 +160,7 @@ def run_one_workflow(config: WorkflowConfig) -> WorkflowResult:
             restricted=config.restricted,
             electric_field=config.electric_field,
             output_paths=paths,
-            basis=str(config.basis),
+            basis=config.basis,
             closed_shell=config.closed_shell,
         )
     elif config.source == "pyscf":
@@ -209,6 +210,7 @@ def run_one_workflow(config: WorkflowConfig) -> WorkflowResult:
         electric_field=config.electric_field,
         output_paths=paths,
     )
+    x_ss = ssd_x_ss(config.functional)   # (value, origin) for the summary's SSD-OPMP3
     w_results = run_pyscf_w_matrices(
         mol=mf_dft.mol,
         semicanonical=sc,
@@ -218,6 +220,7 @@ def run_one_workflow(config: WorkflowConfig) -> WorkflowResult:
         auxbasis=config.auxbasis,
         memory=config.memory,
         output_paths=paths,
+        x_ss=x_ss[0],
     )
 
     result = WorkflowResult(
@@ -236,6 +239,7 @@ def run_one_workflow(config: WorkflowConfig) -> WorkflowResult:
             "Reference energy (HF on Molden density)" if direct
             else "Reference energy (HF on KS density)",
         ),
+        ssd_x_ss=x_ss,
     )
 
     # Written here too, so that callers other than cli.py get the summary.

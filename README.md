@@ -6,7 +6,7 @@ The paper splits the MP2 and MP3 correlation energies over the occupied orbitals
 
 | directory | content |
 |---|---|
-| [`Wmatrix_code/`](Wmatrix_code/) | reference determinant → semicanonical orbitals → the eight W matrices of a molecule, the MP2/MP3 energies given by their traces, and the OP-MP3, SOP-MP3 and SSD-OPMP3 (x_ss = 0.5) energies |
+| [`Wmatrix_code/`](Wmatrix_code/) | reference determinant → semicanonical orbitals → the eight W matrices of a molecule, the MP2/MP3 energies given by their traces, and the OP-MP3, SOP-MP3 and SSD-OPMP3 energies (SSD-OPMP3 at the paper's x_ss for the functional, else 0.5) |
 | [`analysis_code/`](analysis_code/) | every resummed model of the paper for one molecule from its W matrices, at the scaling parameters given |
 | [`interactive_htmls/`](interactive_htmls/) | interactive versions of the paper's figures, one HTML file each with its data embedded; GitHub shows them as source, so download one and open it in a browser |
 

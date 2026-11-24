@@ -1,12 +1,15 @@
 """Unit tests — no DFT calculations, completes in seconds."""
 from __future__ import annotations
-from dataclasses import replace
+from dataclasses import fields, replace
 import pytest
 from conftest import DATA_DIR, FIELD_Z, make_config, AUXBASIS, BASIS
 from electric_field import parse_electric_field
 from run_qchem import make_qchem_input
 from workflow import _build_child_command, validate_config
-from workflow_common import read_xyz, resolve_frozen_core
+from workflow_common import (
+    DEFAULT_X_SS, derive_batch_paths, derive_output_paths, read_xyz,
+    resolve_frozen_core, ssd_x_ss,
+)
 
 
 class TestReadXyz:
@@ -342,3 +345,51 @@ class TestEcpByAtomLabel:
         b = handle_basis_core("cc-pvdz-pp", self._mol(["I1", "I2"]))
         assert b["I1"] == b["I2"] == b["I"] == "cc-pvdz-pp"
         assert b["default"] == "cc-pvdz" and b["H"] == "cc-pvdz"
+
+
+def _all_output_paths(input_path):
+    """Every path derive_output_paths / derive_batch_paths give for one input."""
+    p = derive_output_paths(input_path)
+    b = derive_batch_paths(input_path)
+    return ([getattr(p, f.name) for f in fields(p) if f.name != "base"]
+            + [p.w_matrix("W2alpha_ss"), p.semicanonical_array("coeff_a"), b.stdout, b.stderr])
+
+
+class TestOutputPaths:
+    """Outputs keep the input's whole stem, dots included (h2o.opt.xyz once
+    wrote h2o.final.out beside h2o.opt.W*.npy)."""
+
+    @pytest.mark.parametrize("name", ["h2o.xyz", "h2o.opt.xyz", "mol.a.b.molden", "x.chk"])
+    def test_every_path_keeps_the_stem(self, tmp_path, name):
+        stem = name.rsplit(".", 1)[0]
+        for path in _all_output_paths(tmp_path / name):
+            assert path.parent == tmp_path.resolve(), path
+            assert path.name.startswith(stem + "."), path.name
+
+    def test_inputs_differing_after_a_dot_do_not_collide(self, tmp_path):
+        a = set(_all_output_paths(tmp_path / "mol.a.xyz"))
+        b = set(_all_output_paths(tmp_path / "mol.b.xyz"))
+        assert not a & b, sorted(str(p) for p in a & b)
+
+
+class TestSsdXss:
+    """x_ss of the summary's SSD-OPMP3: the paper's value for the functional."""
+
+    @pytest.mark.parametrize("functional,x_ss", [
+        ("hf", 0.0), ("HF", 0.0), ("spw92", 0.75), ("pbe", 0.70),
+        ("r2scan", 0.60), ("r2SCAN", 0.60), ("pbe0", 0.50), ("PBE0", 0.50),
+        ("wb97x-v", 0.50), ("wB97M-V", 0.50), ("wb97m_v", 0.50), ("ωB97X-V", 0.50),
+    ])
+    def test_paper_values(self, functional, x_ss):
+        value, origin = ssd_x_ss(functional)
+        assert value == x_ss and "paper" in origin and functional in origin
+
+    @pytest.mark.parametrize("functional", ["b3lyp", "tpss", "wb97x"])
+    def test_other_functional_gets_the_default(self, functional):
+        value, origin = ssd_x_ss(functional)
+        assert value == DEFAULT_X_SS and origin.startswith("default") and functional in origin
+
+    @pytest.mark.parametrize("functional", [None, ""])
+    def test_no_functional_gets_the_default(self, functional):
+        value, origin = ssd_x_ss(functional)
+        assert value == DEFAULT_X_SS and origin.startswith("default")

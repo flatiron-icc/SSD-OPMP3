@@ -1,6 +1,6 @@
 # W matrices
 
-For a reference determinant, computes and writes the eight W matrices of K. Bystrom, T. C. Berkelbach and D. Hait, arXiv:2609.25330 (Eqs. 17–18: W⁽²⁾ and W⁽³⁾, same-spin and opposite-spin, alpha and beta blocks) and the MP2 and MP3 energies given by their traces. The paper's resummation schemes act on these matrices and require another codebase, which is in the paper's Zenodo repository (https://doi.org/10.5281/zenodo.23482348) together with the W-matrix code used for the paper (based on PySCF's ADC(3) module); the OP-MP3, SOP-MP3 and SSD-OPMP3 energies (Eqs. 14, 21 and 22; SSD-OPMP3 with x_ss = 0.5) are printed here by default.
+For a reference determinant, computes and writes the eight W matrices of K. Bystrom, T. C. Berkelbach and D. Hait, arXiv:2609.25330 (Eqs. 17–18: W⁽²⁾ and W⁽³⁾, same-spin and opposite-spin, alpha and beta blocks) and the MP2 and MP3 energies given by their traces. The OP-MP3, SOP-MP3 and SSD-OPMP3 energies (Eqs. 14, 21 and 22; SSD-OPMP3 at an indicative x_ss, §6) are printed here by default; `../analysis_code/` evaluates every model of the paper, at any parameters, from the saved matrices. The W-matrix code used for the paper (based on PySCF's ADC(3) module) is in the paper's Zenodo repository (https://doi.org/10.5281/zenodo.23482348).
 
 ## 1. What is computed
 
@@ -43,7 +43,7 @@ python cli.py inputs/ --source pyscf --functional pbe0 --basis cc-pvdz --workers
 | `chk` | `.chk` | PySCF SCF restarted from a PySCF checkpoint, which it overwrites |
 | `molden-direct` | `.molden` | the file's orbitals as written; no SCF |
 
-**XYZ**: atom count; charge and multiplicity (further text on the line is ignored; `charge=0 multiplicity=1` also works); one `element x y z` line per atom, in Å. `tests/data/h2o.xyz`:
+**XYZ**: atom count; charge and multiplicity (`0 1`, with any further text on the line ignored, or `charge=0 multiplicity=1` with nothing else); one `element x y z` line per atom, in Å. `tests/data/h2o.xyz`:
 
 ```
 3
@@ -60,7 +60,7 @@ H 0.9289588892 0.0000000000 -0.2336831018
 | flag | meaning |
 |---|---|
 | `--functional` | XC functional or `hf`; required except with `molden-direct`, where it is rejected |
-| `--basis` | required for `qchem`, `pyscf`, `chk`; the Molden modes take the AO basis from the file and use `--basis` only to choose the ECP |
+| `--basis` | a basis name (lowercased); required for `qchem`, `pyscf`, `chk`; the Molden modes take the AO basis from the file and use `--basis` only to choose the ECP, the `cc-*` family without it |
 | `--restricted` | restricted open-shell (RO-DFT/ROHF) reference; with `molden-direct`, the check of §4 |
 | `--closed-shell` | RKS/RHF reference and the closed-shell amplitude code; singlets only; overrides `--restricted` |
 | `--frozen-core N` / `fc` | frozen orbitals per spin, or PySCF's chemical core count (§7.1) |
@@ -85,7 +85,7 @@ Basis substitutions, applied per element: H and He get the valence basis (`cc-pc
 | `<stem>.{in,out,molden}` | Q-Chem input, output and orbitals (`qchem` mode) |
 | `<stem>.batch.{stdout,stderr}` | batch mode only |
 
-Each W matrix is real, symmetric and `(nact, nact)` over the active (not frozen) occupied orbitals of its spin. The `OP-MP3`, `SOP-MP3` and `SSD-OPMP3 (x_ss = 0.5)` total energies in `.final.out` are E_HF + E_S⁽²⁾ + the resummed correlation of Eqs. 14, 21 and 22. `MP2 doubles correlation` is Tr W⁽²⁾, `MP2 correlation` adds E_S⁽²⁾, and `MP3 correlation` is Tr W⁽³⁾; the same-spin and opposite-spin parts of both are listed too. Tr W⁽²⁾ from the saved matrices:
+Each W matrix is real, symmetric and `(nact, nact)` over the active (not frozen) occupied orbitals of its spin. The `OP-MP3`, `SOP-MP3` and `SSD-OPMP3 (x_ss = …)` total energies in `.final.out` are E_HF + E_S⁽²⁾ + the resummed correlation of Eqs. 14, 21 and 22. The x_ss of this indicative SSD-OPMP3 energy is the paper's fitted value for `--functional` (`hf` 0, `spw92` 0.75, `pbe` 0.70, `r2scan` 0.60, `pbe0`, `wb97x-v`, `wb97m-v` 0.50; case, spaces, `-` and `_` ignored, `ω` read as `w`) and 0.5 for any other functional and for `molden-direct` (note κOOMP2 uses this mode but its optimal x_ss is 0.45); the `SSD-OPMP3 x_ss` line of the summary gives the value and where it comes from. `analysis_code/` evaluates SSD-OPMP3 at any x_ss. `MP2 doubles correlation` is Tr W⁽²⁾, `MP2 correlation` adds E_S⁽²⁾, and `MP3 correlation` is Tr W⁽³⁾; the same-spin and opposite-spin parts of both are listed too. Tr W⁽²⁾ from the saved matrices:
 
 ```python
 import numpy as np
@@ -107,12 +107,15 @@ e2 = sum(tr(f"W2{s}_{t}") for s in ("alpha", "beta") for t in ("ss", "os"))
 
 ## 8. Tests
 
-`pytest tests/` from this directory: 2334 tests; those marked `qchem` are skipped when Q-Chem is not on `PATH`. The suite runs H, He, H₂O, CN, CH₂, CH₃ and HCO in cc-pVDZ, and triplet He (two α electrons, no β; cc-pVTZ, since in cc-pVDZ its MP2 and MP3 energies vanish), with HF and PBE0 references, unrestricted, restricted open-shell and closed-shell, with frozen core, density fitting and a field, and checks:
+`pytest tests/` from this directory: 2766 tests; those marked `qchem` are skipped when Q-Chem is not on `PATH`. The suite runs H, He, H₂O, CN, CH₂, CH₃ and HCO in cc-pVDZ, and triplet He (two α electrons, no β; cc-pVTZ, since in cc-pVDZ its MP2 and MP3 energies vanish), with HF and PBE0 references, unrestricted, restricted open-shell and closed-shell, with frozen core, density fitting and a field, and checks:
 
 - E_HF, E_S⁽²⁾ and Tr W⁽²⁾ to 1e-5 Eh, and Tr W⁽³⁾ to 1e-4 Eh, against Q-Chem MP2 and MP3 (`tests/data/references/`);
-- each closed-shell run against its unrestricted counterpart;
-- every source mode against the run whose orbitals it reads;
-- batch mode against single runs.
+- for one variant of each code path, the singular values and trace of each of the eight W blocks and the OP-MP3, SOP-MP3 and SSD-OPMP3 energies to 1e-10 Eh against an independent spin-orbital evaluation of Eqs. 7, 9 and 11a from the run's own orbitals (`tests/reference_w.py`); W elements depend on orbital phases and degenerate rotations, so only these invariants are compared;
+- each closed-shell run against its unrestricted counterpart (traces, singular values of every block, resummed energies);
+- every source mode against the run whose orbitals it reads (the same);
+- batch mode against single runs;
+- the output file names (inputs with dots in their names) and the x_ss reported for SSD-OPMP3;
+- the ECP that both Molden modes attach without `--basis`.
 
 Runs are written to `tests/_runs/`, which each session recreates.
 

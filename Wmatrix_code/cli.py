@@ -15,8 +15,10 @@ from workflow_common import SUPPORTED_SOURCES, WorkflowConfig, emit_result
 
 _DESCRIPTION = """\
 Generate the W2 and W3 matrices, the MP2/MP3 energies given by their traces
-and the OP-MP3, SOP-MP3 and SSD-OPMP3 (x_ss = 0.5) energies for one reference
-Slater determinant.
+and the OP-MP3, SOP-MP3 and SSD-OPMP3 energies for one reference Slater
+determinant.  SSD-OPMP3 is indicative: its x_ss is the paper's value for
+--functional (hf 0, spw92 0.75, pbe 0.7, r2scan 0.6, pbe0/wb97x-v/wb97m-v 0.5),
+otherwise 0.5, and is stated in the summary.
 
 The determinant can come from a DFT or HF calculation that this workflow runs
 for you (--source qchem / pyscf / molden / chk), or from a Molden file whose
@@ -94,7 +96,8 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "AO basis set, e.g. cc-pvdz. Required for qchem, pyscf and chk. "
             "molden and molden-direct read the AO basis from the Molden file "
-            "(for those, --basis only selects the ECP family for elements beyond Kr)."
+            "(for those, --basis only selects the ECP family for elements beyond Kr; "
+            "without it, the cc-* family)."
         ),
     )
     ref.add_argument(
