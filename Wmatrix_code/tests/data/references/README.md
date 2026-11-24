@@ -19,4 +19,4 @@ A closed-shell run is compared with the file of its unrestricted counterpart, an
 | `tr_w2_ss`, `tr_w2_os`, `tr_w2` | MP2 doubles correlation: same-spin, opposite-spin, total (without `e_nbs`) |
 | `tr_w3` | MP3 total − MP2 total |
 
-`qchem_results/` holds the Q-Chem inputs and outputs: an SCF job, then MP2 and MP3 jobs on its orbitals. Every `he-triplet` job sets a zero `$multipole_field`, which switches off the quadrupole field that Q-Chem otherwise applies. `qchem_results/generate_references.py <outputs>` writes the JSON files from the outputs and checks that `tr_w2 + e_nbs` equals Q-Chem's MP2 correlation energy.
+`qchem_results/` holds the Q-Chem inputs: an SCF job, then MP2 and MP3 jobs on its orbitals. Every `he-triplet` job sets a zero `$multipole_field`, which switches off the quadrupole field that Q-Chem otherwise applies. `qchem_results/generate_references.py <outputs>` writes the JSON files from the outputs and checks that `tr_w2 + e_nbs` equals Q-Chem's MP2 correlation energy.
