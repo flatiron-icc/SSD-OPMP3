@@ -7,7 +7,7 @@ The paper splits the MP2 and MP3 correlation energies over the occupied orbitals
 | directory | content |
 |---|---|
 | [`Wmatrix_code/`](Wmatrix_code/) | reference determinant → semicanonical orbitals → the eight W matrices of a molecule, the MP2/MP3 energies given by their traces, and the OP-MP3, SOP-MP3 and SSD-OPMP3 (x_ss = 0.5) energies |
-| [`analysis_code/`](analysis_code/) | the resummed models and their fits from W matrices, and their reaction-energy errors against CCSD(T) |
+| [`analysis_code/`](analysis_code/) | every resummed model of the paper for one molecule from its W matrices, at the scaling parameters given |
 | [`interactive_htmls/`](interactive_htmls/) | interactive versions of the paper's figures, one HTML file each with its data embedded; GitHub shows them as source, so download one and open it in a browser |
 
 Each directory has its own README.
@@ -16,7 +16,7 @@ The W matrices of the paper were computed with the ADC(3)-based code of the pape
 
 ## Requirements
 
-Python 3.12 with `numpy`, `scipy` and `pyyaml`; `Wmatrix_code/` also needs `pyscf`, and Q-Chem only for `--source qchem`. Nothing to install: run the scripts with Python. Tested versions are in each README.
+Python 3.12 with `numpy` and `scipy`; `Wmatrix_code/` also needs `pyscf` and `pyyaml`, and Q-Chem only for `--source qchem`. Nothing to install: run the scripts with Python. Tested versions are in each README.
 
 ## From W matrices to resummed energies
 
@@ -27,7 +27,7 @@ Python 3.12 with `numpy`, `scipy` and `pyyaml`; `Wmatrix_code/` also needs `pysc
 
 The first writes the W matrices and `h2o.final.out`, the second `h2o.analysis.out` with every model of `analysis_code/README.md` §2.
 
-For a dataset, `Wmatrix_code/` run on a directory (`python Wmatrix_code/cli.py TREE/PBE0/ ...`) writes every molecule's files side by side, which is the `--flat` layout of `analysis_code/` (`--flat TREE --xc PBE0`).
+Run on a directory (`python Wmatrix_code/cli.py DIR/ ...`), `Wmatrix_code/` writes every molecule's files side by side; `compute_resummed_energies.py` then takes one molecule at a time by its prefix, `DIR/<name>`.
 
 ## Tests
 

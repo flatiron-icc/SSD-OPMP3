@@ -27,17 +27,16 @@ put c_i = (V^-1 W2 V)_ii. Since W2 - x W3 = W2 (1 - x Z),
 
 For a non-singular W2 the pseudo-inverse is the inverse and this is the
 paper's P(W2, x W3) exactly. W2 is singular when an occupied orbital
-carries no correlation, which is the frozen-core case: a frozen orbital
-has a zero row and column in both W2 and W3 (it enters no amplitude), so
-P is defined on the range of W2 and the frozen orbital drops out, with
-zeta = 0 and c = 0. The pair is decomposed once; a fit then varies x at
-no further cost. The scalar Padé is the same expression on the 1x1
-matrices [[E2]], [[E3]]: zeta = E3/E2 and c = E2 give
-E2 / (1 - x E3/E2) = E2^2 / (E2 - x E3). Because sum_i c_i = Tr W2 = E2
-and sum_i c_i zeta_i = Tr(W2 Z) = E3, expanding
-c_i / (1 - x zeta_i) = c_i (1 + x zeta_i + x^2 zeta_i^2 + ...) shows that
-the resummation reproduces E2 + x E3 through first order in x and
-supplies the higher orders as a geometric series.
+carries no correlation, as a frozen orbital kept as a zero row and column
+of W2 and W3 (it enters no amplitude); P is then defined on the range of
+W2 and that orbital drops out, with zeta = 0 and c = 0. The pair is
+decomposed once, and every x then costs only the sum. The scalar Padé is
+the same expression on the 1x1 matrices [[E2]], [[E3]]:
+zeta = E3/E2 and c = E2 give E2 / (1 - x E3/E2) = E2^2 / (E2 - x E3).
+Because sum_i c_i = Tr W2 = E2 and sum_i c_i zeta_i = Tr(W2 Z) = E3,
+expanding c_i / (1 - x zeta_i) = c_i (1 + x zeta_i + x^2 zeta_i^2 + ...)
+shows that the resummation reproduces E2 + x E3 through first order in x
+and supplies the higher orders as a geometric series.
 
 The resummations set aside in the paper (--alt-resummations only) replace
 1 / (1 - z) by another g(z) with g(0) = g'(0) = 1, E_c = sum_i c_i g(x zeta_i):
@@ -45,9 +44,9 @@ Padé–Borel g(z) = f(3/z)/2 with f(w) = w^3 (e^-w Ei(w) - 1/w - 1/w^2);
 exponential e^z; Landau–Zener (e^(2z) - 1)/(2z); logarithmic
 -ln(1 - 2z)/(2z).
 
-The spectra of many systems are concatenated and summed segment-wise, so
-a fit objective over a dataset is one vectorised call.  A pair with an
-empty sector, Tr W2 = 0 or W3 = 0 carries its value instead of a spectrum.
+The spectra of several systems are concatenated and summed segment-wise.
+A pair with an empty sector, Tr W2 = 0 or W3 = 0 carries its value
+instead of a spectrum.
 """
 
 from __future__ import annotations
@@ -159,8 +158,7 @@ def _per_system(sp: Spectra, values: np.ndarray) -> np.ndarray:
 
 def _resum(sp: Spectra, g: Callable[[np.ndarray], np.ndarray],
            x: float) -> np.ndarray:
-    """sum_i Re[c_i g(x zeta_i)] per system. Overflow yields inf silently;
-    the fit maps non-finite energies to an infinite objective."""
+    """sum_i Re[c_i g(x zeta_i)] per system. Overflow yields inf silently."""
     with np.errstate(all="ignore"):
         return _per_system(sp, np.real(sp.c * g(x * sp.zeta)))
 

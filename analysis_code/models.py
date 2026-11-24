@@ -82,8 +82,6 @@ SECOND_ORDER   = "E2"              # MP2
 SCALED         = "E2+x*E3"         # MP2.X, OP-MP3(x)
 SPIN_SEPARATED = "ss+os fixed"     # SOP-MP3 at fixed (x_ss, x_os); SSD-OPMP3 at (x_ss, 1)
 SCALED_SS_OS   = "x_ss,x_os"       # SOP-MP3(x_ss, x_os)
-SCALED_SS      = "x_ss"            # x_os = 1
-OS_ONLY        = "x_os"            # x_ss = 0
 SCS_MP2        = "SCS-MP2"         # literature spin-component scalings (MP only)
 SOS_MP2        = "SOS-MP2"
 SCS_MP3        = "SCS-MP3"
@@ -91,9 +89,8 @@ SCS_MP3        = "SCS-MP3"
 # Parameter-free MP-series models. The spin-separated MP series at (1, 1)
 # is MP3 itself, so the MP series has no SOP-MP3 counterpart.
 MP_DEFAULTS = (SECOND_ORDER, UNSCALED, SCS_MP2, SOS_MP2, SCS_MP3)
-FITTED      = (SCALED, SCALED_SS_OS, SCALED_SS, OS_ONLY)
 
-# Fit parameters, named as in the paper.
+# Scaling parameters, named as in the paper.
 X, X_SS, X_OS = "x", "x_ss", "x_os"
 
 
@@ -102,7 +99,7 @@ class Contribution:
     """One (W2 block, W3 block) pair entering a model.
 
     scale multiplies the third-order block: a number, or the name of a
-    fit parameter. weight multiplies the whole contribution; it is 1
+    scaling parameter. weight multiplies the whole contribution; it is 1
     except in the literature spin-component-scaled models, whose
     coefficients sit on the SECOND order (SCS-MP2 = p_ss E2_ss +
     p_os E2_os), which a scale on the third order cannot express.
@@ -130,10 +127,6 @@ def contributions(scaling: str,
         return [C(*_SS, x_ss), C(*_OS, x_os)]
     if scaling == SCALED_SS_OS:
         return [C(*_SS, X_SS), C(*_OS, X_OS)]
-    if scaling == SCALED_SS:
-        return [C(*_SS, X_SS), C(*_OS, 1.0)]
-    if scaling == OS_ONLY:
-        return [C(*_SS, 0.0), C(*_OS, X_OS)]
     if scaling == SCS_MP2:
         return [C(*_SS, 0.0, SCS_MP2_SS), C(*_OS, 0.0, SCS_MP2_OS)]
     if scaling == SOS_MP2:
@@ -158,7 +151,7 @@ class ModelKey:
 
     def display_name(self) -> str:
         """The paper's name for this model: OP-MP3, SOP-MP3,
-        SSD-OPMP3(x_ss) and their fitted forms; the scalar variants drop
+        SSD-OPMP3(x_ss) and their scaled forms; the scalar variants drop
         the O of "orbital" (P-MP3, SP-MP3, SSD-PMP3)."""
         if self.resummation == MP:
             return _MP_NAMES[self.scaling]
@@ -175,8 +168,6 @@ class ModelKey:
             UNSCALED:     base,
             SCALED:       f"{base}(x)",
             SCALED_SS_OS: f"S{base}(x_ss,x_os)",
-            SCALED_SS:    f"{ssd}(x_ss)",
-            OS_ONLY:      f"S{base}(x_ss=0;x_os)",
         }[self.scaling]
 
 
@@ -184,7 +175,6 @@ _MP_NAMES = {
     SECOND_ORDER: "MP2", UNSCALED: "MP3", SCS_MP2: "SCS-MP2",
     SOS_MP2: "SOS-MP2", SCS_MP3: "SCS-MP3",
     SCALED: "MP2.X", SCALED_SS_OS: "MP2.X(x_ss,x_os)",
-    SCALED_SS: "MP2.X(x_ss;x_os=1)", OS_ONLY: "MP2.X(x_ss=0;x_os)",
 }
 
 
@@ -195,13 +185,6 @@ def is_scalar_name(name: str) -> bool:
     base = name.split("(")[0]
     return any(base in (f"{s}-MP3", f"S{s}-MP3", f"SSD-{s}MP3")
                for s in (r.stem for r in RESUMMATIONS if r.stem))
-
-
-def params_of(key: ModelKey) -> tuple[str, ...]:
-    """The fit parameters a model needs: the symbolic scales it contains."""
-    return tuple(dict.fromkeys(
-        c.scale for c in contributions(key.scaling, key.x_fixed)
-        if isinstance(c.scale, str)))
 
 
 def default_model_keys(
@@ -219,11 +202,12 @@ def default_model_keys(
     return keys
 
 
-def fit_model_keys(alt: bool = False) -> list[ModelKey]:
-    """The models with fitted parameters."""
-    return ([ModelKey(MP, s) for s in FITTED]
+def scaled_model_keys(alt: bool = False) -> list[ModelKey]:
+    """The models scaled by x or by (x_ss, x_os)."""
+    scalings = (SCALED, SCALED_SS_OS)
+    return ([ModelKey(MP, s) for s in scalings]
             + [ModelKey(name, s, orbital) for name in _resummed(alt)
-               for orbital in (True, False) for s in FITTED])
+               for orbital in (True, False) for s in scalings])
 
 
 # ---------------------------------------------------------------------------
