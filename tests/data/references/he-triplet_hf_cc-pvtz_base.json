@@ -1,0 +1,12 @@
+{
+  "e_hf": -1.91416856,
+  "e_nbs": -0.0,
+  "tr_w2_ss": -0.0007824302,
+  "tr_w2_os": 0.0,
+  "tr_w2": -0.0007824302,
+  "tr_w3": -0.00011495,
+  "mol": "he-triplet",
+  "functional": "hf",
+  "basis": "cc-pvtz",
+  "tag": "base"
+}

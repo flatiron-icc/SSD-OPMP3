@@ -1,0 +1,12 @@
+{
+  "e_hf": -113.25428551,
+  "e_nbs": -0.0030717573,
+  "tr_w2_ss": -0.080516321,
+  "tr_w2_os": -0.2223282974,
+  "tr_w2": -0.3028446184,
+  "tr_w3": -0.00102131,
+  "mol": "hco",
+  "functional": "hf",
+  "basis": "cc-pvdz",
+  "tag": "field-z-restricted"
+}

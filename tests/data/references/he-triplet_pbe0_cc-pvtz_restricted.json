@@ -1,0 +1,12 @@
+{
+  "e_hf": -1.9141394,
+  "e_nbs": -2.4906e-05,
+  "tr_w2_ss": -0.0007865865,
+  "tr_w2_os": 0.0,
+  "tr_w2": -0.0007865865,
+  "tr_w3": -0.00011547,
+  "mol": "he-triplet",
+  "functional": "pbe0",
+  "basis": "cc-pvtz",
+  "tag": "restricted"
+}
