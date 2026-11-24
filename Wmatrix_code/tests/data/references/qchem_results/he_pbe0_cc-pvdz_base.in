@@ -1,0 +1,66 @@
+$molecule
+0 1
+He 0 0 0
+$end
+
+$rem
+method pbe0
+print_orbitals true
+molden_format true
+symmetry false
+sym_ignore true
+basis cc-pvdz
+unrestricted true
+scf_algorithm gdm
+internal_stability_iter 15
+internal_stability_davidson_iter 200
+max_scf_cycles 1000
+scf_convergence 9
+mem_total 16000
+mem_static 1500
+cc_symmetry false
+$end
+@@@@@
+$molecule
+read
+$end
+
+$rem
+method mp2
+scf_guess read
+max_scf_cycles 0
+gen_scfman false
+unrestricted true
+symmetry false
+sym_ignore true
+basis cc-pvdz
+scf_convergence 9
+n_frozen_core 0
+mem_total 16000
+cc_memory 12800
+mem_static 1500
+cc_symmetry false
+$end
+
+@@@@@
+$molecule
+read
+$end
+
+$rem
+method mp3
+scf_guess read
+max_scf_cycles 0
+gen_scfman false
+unrestricted true
+symmetry false
+sym_ignore true
+basis cc-pvdz
+scf_convergence 9
+n_frozen_core 0
+mem_total 16000
+cc_memory 12800
+mem_static 1500
+cc_symmetry false
+$end
+
