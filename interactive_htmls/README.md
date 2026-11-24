@@ -1,6 +1,6 @@
 # Interactive figures
 
-Four pages for K. Bystrom, T. C. Berkelbach and D. Hait, arXiv:2609.25330. Each is one file with all its data embedded and no external resources; open it in a browser. The view is kept in the URL, so it can be linked.
+Four interactive HTMLs showing the performance of SSD-OPMP3 and other resummed methods.
 
 | page | shows |
 |---|---|
