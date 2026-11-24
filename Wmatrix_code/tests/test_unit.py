@@ -44,10 +44,21 @@ class TestReadXyz:
         with pytest.raises(ValueError):
             read_xyz(tmp_path / "mol.xyz")
 
-    def test_comment_on_header_line_ignored(self, tmp_path):
-        (tmp_path / "mol.xyz").write_text("1\n0 1 comment text\nH 0 0 0\n")
+    @pytest.mark.parametrize("header", [
+        "0 1 comment text",
+        "charge=0 multiplicity=1",
+        "charge=0 multiplicity=1 comment text",
+        "comment charge=0, multiplicity=1, more",
+    ])
+    def test_both_header_forms_ignore_further_text(self, tmp_path, header):
+        (tmp_path / "mol.xyz").write_text(f"1\n{header}\nH 0 0 0\n")
         charge, mult, _ = read_xyz(tmp_path / "mol.xyz")
         assert charge == 0 and mult == 1
+
+    def test_key_value_form_missing_multiplicity_raises(self, tmp_path):
+        (tmp_path / "mol.xyz").write_text("1\ncharge=0 comment\nH 0 0 0\n")
+        with pytest.raises(ValueError, match="charge and multiplicity"):
+            read_xyz(tmp_path / "mol.xyz")
 
 
 class TestParseElectricField:

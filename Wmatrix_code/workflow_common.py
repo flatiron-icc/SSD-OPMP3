@@ -153,7 +153,8 @@ class WorkflowResult:
 
 def read_xyz(xyz_file: str | Path) -> tuple[int, int, str]:
     """(charge, multiplicity, coordinate lines) of an XYZ file whose second
-    line starts with the charge and multiplicity (README §4)."""
+    line gives the charge and multiplicity as ``0 1`` (the first two tokens)
+    or as ``charge=0 multiplicity=1``; any further text is ignored (README §4)."""
     xyz_path = Path(xyz_file)
     if xyz_path.suffix.lower() != ".xyz":
         raise ValueError(f"Expected an XYZ file, got {xyz_path}")
@@ -175,19 +176,18 @@ def read_xyz(xyz_file: str | Path) -> tuple[int, int, str]:
     try:
         charge       = int(header_tokens[0])
         multiplicity = int(header_tokens[1])
-    except ValueError as exc:
+    except ValueError:
+        # key=value form: tokens other than charge=... and multiplicity=...
+        # are ignored, as is further text after the two numbers above.
+        values: dict[str, str] = {}
+        for token in header_tokens:
+            key, sep, value = token.partition("=")
+            if sep and key.strip().lower() in ("charge", "multiplicity"):
+                values[key.strip().lower()] = value.replace(",", "")
         try:
-            props = [p.split("=") for p in header_tokens]
-            charge = None
-            multiplicity = None
-            for k, v in props:
-                if k.lower().strip() == "charge":
-                    charge = int(v.replace(",", ""))
-                elif k.lower().strip() == "multiplicity":
-                    multiplicity = int(v.replace(",", ""))
-            if charge is None or multiplicity is None:
-                raise ValueError
-        except ValueError as exc:
+            charge       = int(values["charge"])
+            multiplicity = int(values["multiplicity"])
+        except (KeyError, ValueError) as exc:
             raise ValueError(
                 f"Could not parse charge and multiplicity from the second line of {xyz_path}"
             ) from exc
