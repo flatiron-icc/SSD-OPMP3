@@ -7,7 +7,8 @@ and the OP-MP3, SOP-MP3 and SSD-OPMP3 energies.
 
 - each block against an independent spin-orbital evaluation of Eqs. 7, 9
   and 11a (reference_w.py) from the run's own orbitals, for one variant per
-  code path (U, RO, closed shell, frozen core, DF, field, empty beta block);
+  code path (U, RO, closed shell, frozen core, DF, field, empty beta block,
+  ECP);
 - each closed-shell run against its unrestricted twin;
 - --source chk and molden-direct against the run whose orbitals they read;
 - the x_ss of the summary's SSD-OPMP3 energy (ssd_x_ss of the functional).
@@ -39,6 +40,7 @@ _REF_IDS = (
     "cn-pbe0-RO", "cn-pbe0-U-fcfc", "cn-hf-U-df", "ch2-hf-U",
     "ch3-pbe0-RO-df", "hco-pbe0-RO-field", "he-pbe0-U-CS",
     "he-triplet-hf-U-cc-pvtz", "he-triplet-pbe0-RO-cc-pvtz",
+    "ag+-hf-U-def2-svp", "ag+-pbe0-U-CS-cc-pvdz-pp",
 )
 REF_PARAMS = [pytest.param(_BY_ID[i], id=i) for i in _REF_IDS]
 

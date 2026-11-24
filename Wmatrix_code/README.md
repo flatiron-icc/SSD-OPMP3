@@ -60,7 +60,7 @@ H 0.9289588892 0.0000000000 -0.2336831018
 | flag | meaning |
 |---|---|
 | `--functional` | XC functional or `hf`; required except with `molden-direct`, where it is rejected |
-| `--basis` | a basis name (lowercased); required for `qchem`, `pyscf`, `chk`; the Molden modes take the AO basis from the file and use `--basis` only to choose the ECP, the `cc-*` family without it |
+| `--basis` | a basis name (lowercased); required for `qchem`, `pyscf`, `chk`; the Molden modes take the AO basis from the file and use `--basis` only to choose the ECP, the `cc-*` family without it; a Molden file carries no ECP, so give `--basis` (e.g. `def2-svp`) for a file in a `def2-*` basis |
 | `--restricted` | restricted open-shell (RO-DFT/ROHF) reference; with `molden-direct`, the check of §4 |
 | `--closed-shell` | RKS/RHF reference and the closed-shell amplitude code; singlets only; overrides `--restricted` |
 | `--frozen-core N` / `fc` | frozen orbitals per spin, or PySCF's chemical core count (§7.1) |
@@ -107,7 +107,7 @@ e2 = sum(tr(f"W2{s}_{t}") for s in ("alpha", "beta") for t in ("ss", "os"))
 
 ## 8. Tests
 
-`pytest tests/` from this directory: 2770 tests; those marked `qchem` are skipped when Q-Chem is not on `PATH`. The suite runs H, He, H₂O, CN, CH₂, CH₃ and HCO in cc-pVDZ, and triplet He (two α electrons, no β; cc-pVTZ, since in cc-pVDZ its MP2 and MP3 energies vanish), with HF and PBE0 references, unrestricted, restricted open-shell and closed-shell, with frozen core, density fitting and a field, and checks:
+`pytest tests/` from this directory: 3076 tests; those marked `qchem` are skipped when Q-Chem is not on `PATH`. The suite runs H, He, H₂O, CN, CH₂, CH₃ and HCO in cc-pVDZ, triplet He (two α electrons, no β; cc-pVTZ, since in cc-pVDZ its MP2 and MP3 energies vanish), and the Ag⁺ cation in def2-SVP and cc-pVDZ-PP with their 28-electron ECPs (its SCF always by PySCF), with HF and PBE0 references, unrestricted, restricted open-shell and closed-shell, with frozen core, density fitting and a field, and checks:
 
 - E_HF, E_S⁽²⁾ and Tr W⁽²⁾ to 1e-5 Eh, and Tr W⁽³⁾ to 1e-4 Eh, against Q-Chem MP2 and MP3 (`tests/data/references/`);
 - for one variant of each code path, the singular values and trace of each of the eight W blocks and the OP-MP3, SOP-MP3 and SSD-OPMP3 energies to 1e-10 Eh against an independent spin-orbital evaluation of Eqs. 7, 9 and 11a from the run's own orbitals (`tests/reference_w.py`); W elements depend on orbital phases and degenerate rotations, so only these invariants are compared;

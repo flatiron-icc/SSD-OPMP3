@@ -18,14 +18,18 @@ The W matrices of the paper were computed with the ADC(3)-based code of the pape
 
 Python 3.12 with `numpy` and `scipy`; `Wmatrix_code/` also needs `pyscf` and `pyyaml`, and Q-Chem only for `--source qchem`. Nothing to install: run the scripts with Python. Tested versions are in each README.
 
-## From W matrices to resummed energies
-
-`Wmatrix_code/` writes a molecule's files next to its input, with the input's name as prefix; `analysis_code/` reads them by that prefix:
+## Running
 
     python Wmatrix_code/cli.py h2o.xyz --source pyscf --functional pbe0 --basis cc-pvdz
-    python analysis_code/compute_resummed_energies.py h2o --x-ss 0.5
 
-The first writes the W matrices and `h2o.final.out`, the second `h2o.analysis.out` with every model of `analysis_code/README.md` §2.
+writes the W matrices and `h2o.final.out`, which gives the MP2, MP3, OP-MP3, SOP-MP3 and SSD-OPMP3 energies, SSD-OPMP3 at the paper's x_ss for the functional, else 0.5 (`Wmatrix_code/README.md` §6). `Wmatrix_code/` writes a molecule's files next to its input, with the input's name as prefix.
+
+`analysis_code/` reads them by that prefix and evaluates every model of the paper at any parameters, e.g. SSD-OPMP3 at x_ss = 0.45 for κOOMP2 orbitals, which enter as a Molden file without a functional:
+
+    python Wmatrix_code/cli.py koomp2.molden --source molden-direct
+    python analysis_code/compute_resummed_energies.py koomp2 --x-ss 0.45
+
+The second writes `koomp2.analysis.out` with every model of `analysis_code/README.md` §2.
 
 Run on a directory (`python Wmatrix_code/cli.py DIR/ ...`), `Wmatrix_code/` writes every molecule's files side by side; `compute_resummed_energies.py` then takes one molecule at a time by its prefix, `DIR/<name>`.
 
@@ -35,7 +39,7 @@ Run on a directory (`python Wmatrix_code/cli.py DIR/ ...`), `Wmatrix_code/` writ
 
 ## License
 
-MIT (`Wmatrix_code/LICENSE`, `analysis_code/LICENSE`), except `Wmatrix_code/mp3.py`, which adapts PySCF code under the Apache License 2.0 (`Wmatrix_code/LICENSE-PySCF`).
+MIT (`LICENSE`, with copies in `Wmatrix_code/` and `analysis_code/`), except `Wmatrix_code/mp3.py`, which adapts PySCF code under the Apache License 2.0 (`Wmatrix_code/LICENSE-PySCF`).
 
 ## Citation
 

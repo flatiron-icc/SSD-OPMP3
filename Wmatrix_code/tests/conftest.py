@@ -7,7 +7,9 @@ them and the parameter lists below are filtered from it.
 The ``run`` fixture does one Q-Chem SCF per (molecule, functional,
 restricted, basis), which is that base variant's run, and restarts every
 other variant of it from that Molden with ``--source molden``.  Without Q-Chem on PATH the SCF is done by PySCF
-instead, and the ``qchem`` tests are skipped.
+instead, and the ``qchem`` tests are skipped.  Ag+ always takes its SCF from
+PySCF: its Q-Chem references use the Basis Set Exchange basis and ECP as
+explicit blocks, which the workflow's Q-Chem input does not carry.
 
 A closed-shell variant must reproduce its unrestricted twin (the same
 Variant with closed_shell=False); this checks the closed-shell code,
@@ -67,6 +69,9 @@ MOLECULES = {
     "ch2": {"mult": 3},
     "ch3": {"mult": 2},
     "hco": {"mult": 2},
+    # Ag+ (4d10), in def2-SVP and cc-pVDZ-PP with their 28-electron ECPs.
+    # qchem_scf False: base SCF by PySCF even with Q-Chem (module docstring).
+    "ag+": {"mult": 1, "qchem_scf": False},
 }
 
 _NO_CORR = {"h"}
@@ -239,6 +244,9 @@ def _make_variants(functional: str) -> list[Variant]:
         Variant("hco",       f, field_z=True),
         Variant("hco",       f, restricted=True, field_z=True),
         Variant("hco",       f, frozen_core="fc"),
+        # Ag+ cation, ECP bases
+        Variant("ag+",       f, basis="def2-svp"),
+        Variant("ag+",       f, basis="cc-pvdz-pp"),
     ]
     return variants + _closed_shell_variants(f)
 
@@ -247,6 +255,7 @@ def _make_variants(functional: str) -> list[Variant]:
 _CLOSED_SHELL_SPEC: dict[str, list[dict]] = {
     "he":        [{}],
     "h2o":       [{}, {"frozen_core": "fc"}, {"df": True}, {"field_z": True}],
+    "ag+":       [{"basis": "def2-svp"}, {"basis": "cc-pvdz-pp"}],
 }
 
 
@@ -455,7 +464,7 @@ def run(_prepare_runs_dir, _qchem_availability_check):
             shutil.copy(DATA_DIR / f"{base_v.mol}.xyz", xyz)
 
             kw = base_v.to_config_kwargs()
-            if _QCHEM_AVAILABLE:
+            if _QCHEM_AVAILABLE and MOLECULES[base_v.mol].get("qchem_scf", True):
                 base_result = run_one_workflow(make_config(xyz, **kw))
                 molden_key  = ResultFileKey.QCHEM_MOLDEN
             else:

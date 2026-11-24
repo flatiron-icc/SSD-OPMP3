@@ -1,6 +1,6 @@
 """--source molden: a restart from a run's own Molden reproduces its traces;
 closed-shell Molden files are accepted in both layouts, spin-polarized ones
-rejected."""
+rejected; without --basis, molden and molden-direct attach the same ECP."""
 from __future__ import annotations
 from pathlib import Path
 import pytest

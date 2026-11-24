@@ -97,7 +97,8 @@ def build_parser() -> argparse.ArgumentParser:
             "AO basis set, e.g. cc-pvdz. Required for qchem, pyscf and chk. "
             "molden and molden-direct read the AO basis from the Molden file "
             "(for those, --basis only selects the ECP family for elements beyond Kr; "
-            "without it, the cc-* family)."
+            "without it, the cc-* family. A Molden file carries no ECP, so give "
+            "--basis for a file in a def2-* basis)."
         ),
     )
     ref.add_argument(

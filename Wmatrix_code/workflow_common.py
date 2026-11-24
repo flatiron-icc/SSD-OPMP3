@@ -171,7 +171,7 @@ def read_xyz(xyz_file: str | Path) -> tuple[int, int, str]:
     header_tokens = lines[1].split()
     if len(header_tokens) < 2:
         raise ValueError(
-            f"The second line of {xyz_path} must begin with charge and multiplicity."
+            f"The second line of {xyz_path} must give the charge and multiplicity."
         )
     try:
         charge       = int(header_tokens[0])
