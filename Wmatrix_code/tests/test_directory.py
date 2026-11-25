@@ -4,8 +4,7 @@ import shutil
 import pytest
 from conftest import DATA_DIR, make_batch_config
 from workflow import run_many_workflows
-from workflow_common import derive_batch_paths
-from pyscf_w_matrices import W2_LABELS, W3_LABELS
+from workflow_common import W2_LABELS, W3_LABELS, derive_batch_paths
 
 _MOLS = ("h", "he", "h2o")
 

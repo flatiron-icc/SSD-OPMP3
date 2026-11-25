@@ -24,7 +24,6 @@ def _fmt(v, field, ours, ref):
     return f"{v.id} {field}: ours={ours:.10f} ref={ref:.10f} diff={abs(ours-ref):.2e}"
 
 
-
 @pytest.mark.reference
 @pytest.mark.parametrize("v", ALL_PARAMS)
 class TestReference:

@@ -45,6 +45,7 @@ def _molden_ecp_hint(basis: str | None) -> str:
     or the cc-* family without it.  Shared by both Molden modes."""
     return basis if basis else _DEFAULT_ECP_BASIS_HINT
 
+
 _THREAD_ENV_VARS = (
     "OMP_NUM_THREADS",
     "OPENBLAS_NUM_THREADS",
@@ -77,13 +78,10 @@ def _set_threads(threads: int) -> None:
     lib.num_threads(int(threads))
 
 
-def _new_closed_dft_reference(mol):
-    """Create the closed-shell (RKS) PySCF mean-field object."""
-    return dft.RKS(mol)
-
-
-def _new_dft_reference(mol, restricted: bool):
-    """Create the PySCF mean-field object for the requested orbital type."""
+def _new_dft_reference(mol, closed_shell: bool, restricted: bool):
+    """The PySCF mean-field object for the requested reference: RKS, ROKS or UKS."""
+    if closed_shell:
+        return dft.RKS(mol)
     return dft.ROKS(mol) if restricted else dft.UKS(mol)
 
 
@@ -137,16 +135,6 @@ def _finalize_run(log_fh, mf, molden_file: Path) -> None:
     log_fh.write("PySCF DFT finished successfully\n")
     log_fh.write("============================================================\n")
     log_fh.flush()
-
-
-def _initial_density_closed_shell(mo_coeff, mo_occ):
-    """Build the AO density used to seed a closed-shell (RKS) Molden restart."""
-    return make_rhf_dm(mo_coeff, mo_occ)
-
-
-def _initial_density(*, mo_coeff, mo_occ):
-    """Build the AO density used to seed a UKS Molden restart."""
-    return make_uhf_dm(mo_coeff, mo_occ)
 
 
 def _soscf(
@@ -252,10 +240,7 @@ def dft_from_molden(
         mol.charge = charge
         mol.build()
 
-        if closed_shell:
-            mf = _new_closed_dft_reference(mol)
-        else:
-            mf = _new_dft_reference(mol, restricted=restricted)
+        mf = _new_dft_reference(mol, closed_shell=closed_shell, restricted=restricted)
 
         with _restore_stdout(mol, mf):
             _configure_molecule_logging(mol, memory=memory, log_fh=log_fh)
@@ -285,11 +270,7 @@ def dft_from_molden(
             )
             if closed_shell:
                 # RKS: seed from the AO density built from the Molden orbitals.
-                mf = _soscf(
-                    mf,
-                    dm0=_initial_density_closed_shell(mo_coeff=coeff, mo_occ=occ),
-                    log_fh=log_fh,
-                )
+                mf = _soscf(mf, dm0=make_rhf_dm(coeff, occ), log_fh=log_fh)
             elif restricted:
                 # ROKS: seed from orbitals/occupations so that the occupation
                 # pattern survives (no aufbau re-diagonalization).
@@ -304,14 +285,7 @@ def dft_from_molden(
                 )
             else:
                 # UKS: seed from the AO density (the spin blocks may differ in length).
-                mf = _soscf(
-                    mf,
-                    dm0=_initial_density(
-                        mo_coeff=(coeff_a, coeff_b),
-                        mo_occ=(occ_a, occ_b),
-                    ),
-                    log_fh=log_fh,
-                )
+                mf = _soscf(mf, dm0=make_uhf_dm((coeff_a, coeff_b), (occ_a, occ_b)), log_fh=log_fh)
             _finalize_run(log_fh, mf, paths.pyscf_molden)
 
     return mf
@@ -448,10 +422,7 @@ def dft_from_xyz(
                 "closed_shell=True requires a spin-singlet molecule, but "
                 f"spin = {mol.spin} (multiplicity {mol.spin + 1})."
             )
-        if closed_shell:
-            mf = _new_closed_dft_reference(mol)
-        else:
-            mf = _new_dft_reference(mol, restricted=restricted)
+        mf = _new_dft_reference(mol, closed_shell=closed_shell, restricted=restricted)
         with _restore_stdout(mol, mf):
             _configure_molecule_logging(mol, memory=memory, log_fh=log_fh)
             mol.build()

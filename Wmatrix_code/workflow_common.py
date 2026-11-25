@@ -27,9 +27,9 @@ W3_LABELS = ("W3alpha_ss", "W3alpha_os", "W3beta_ss", "W3beta_os")
 # Same-spin scaling x_ss of the indicative SSD-OPMP3 energy (the paper's
 # Eq. 22) in the run summary: the value the paper fits for the reference
 # (Fig. 3; W4-17 TAE nonMR), looked up by --functional with case, '-', '_'
-# and spaces ignored and 'ω' read as 'w', and DEFAULT_X_SS otherwise.  kappa-OOMP2 (0.45) enters
-# through molden-direct, without --functional, so it gets the default.
-# analysis_code/ evaluates SSD-OPMP3 at any x_ss.
+# and spaces ignored and 'ω' read as 'w', and DEFAULT_X_SS otherwise.
+# kappa-OOMP2 (0.45) enters through molden-direct, without --functional, so
+# it gets the default.  analysis_code/ evaluates SSD-OPMP3 at any x_ss.
 PAPER_X_SS = {
     "hf":     0.00,
     "spw92":  0.75,
@@ -72,10 +72,10 @@ class SemicanonicalResult:
     pairs, or single arrays with 0/2 occupations when ``closed_shell``."""
     report_file:          str
     molden_file:          str
-    mo_coeff:             tuple   # MO coefficient matrices
-    mo_occ:               tuple   # occupation vectors
-    mo_energy:            tuple   # orbital energies
-    nocc:                 tuple   # occupied orbital counts
+    mo_coeff:             np.ndarray | tuple   # MO coefficient matrices
+    mo_occ:               np.ndarray | tuple   # occupation vectors
+    mo_energy:            np.ndarray | tuple   # orbital energies
+    nocc:                 int | tuple          # occupied orbital counts
     e_hf_from_density:    float
     nuclear_field_energy: float
     e_nbs:                float
@@ -280,7 +280,7 @@ def suggested_default_workers(threads: int, ninputs: int) -> int:
     """Choose a conservative default worker count for directory mode."""
     cpu_count = os.cpu_count()
     if cpu_count is None:
-        return min(1, ninputs)
+        return 1
     return max(1, min(ninputs, cpu_count // max(1, int(threads))))
 
 

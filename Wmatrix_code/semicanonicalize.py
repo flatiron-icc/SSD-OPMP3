@@ -32,24 +32,17 @@ from pyscf_orbitals import (
 from workflow_common import SemicanonicalResult, WorkflowPaths, derive_output_paths
 
 
-_OCC_TOL = 1.0e-8
-
-
 def _semicanonicalize_spin_block(
     c_mo:     np.ndarray,
     f_ao:     np.ndarray,
     occ_spin: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
     """Diagonalize the occupied-occupied and virtual-virtual blocks of the
-    AO Fock matrix ``f_ao`` for one spin.  Returns the semicanonical
-    coefficients (occupied first), their orbital energies, the MO Fock
-    matrix, the 0/1 occupations and the occupied count."""
-    occ_spin = np.asarray(occ_spin, dtype=float)
-    bad = ~(np.isclose(occ_spin, 0.0, atol=_OCC_TOL) | np.isclose(occ_spin, 1.0, atol=_OCC_TOL))
-    if np.any(bad):
-        raise ValueError("Spin occupations must be binary (0 or 1).")
-
-    occ_mask = occ_spin > 0.5
+    AO Fock matrix ``f_ao`` for one spin, given its 0/1 occupations
+    (validated by extract_spin_orbitals_and_occupations).  Returns the
+    semicanonical coefficients (occupied first), their orbital energies, the
+    MO Fock matrix, the 0/1 occupations and the occupied count."""
+    occ_mask = np.asarray(occ_spin) > 0.5
     c_occ    = c_mo[:, occ_mask]
     c_vir    = c_mo[:, ~occ_mask]
 

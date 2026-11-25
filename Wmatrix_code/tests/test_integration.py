@@ -9,13 +9,12 @@ from conftest import (
     DF_CORR_PARAMS, FC_CORR_PARAMS, FC_PARAMS, FIELD_CORR_PARAMS,
     FIELD_PARAMS, Variant,
 )
+from workflow_common import W2_LABELS, W3_LABELS, ResultFileKey
 
 # A closed-shell singlet and its unrestricted twin solve the same equations in
 # different spin bases, so they agree to SCF-convergence precision, not to
 # machine precision.
 CS_ETOL = 1e-7
-from pyscf_w_matrices import W2_LABELS, W3_LABELS
-from workflow_common import ResultFileKey
 
 
 @pytest.mark.parametrize("v", ALL_PARAMS)

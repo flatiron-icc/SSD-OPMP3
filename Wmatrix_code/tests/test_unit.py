@@ -128,7 +128,7 @@ class TestQchemInput:
     def test_method_present(self):         assert "method pbe0"        in self._make()
     def test_basis_present(self):          assert "basis cc-pvdz"      in self._make()
     def test_molden_format(self):          assert "molden_format true" in self._make()
-    def test_unrestricted_always(self):    assert "unrestricted true"  in self._make().lower()
+    def test_unrestricted_default(self):   assert "unrestricted true"  in self._make().lower()
     def test_roscf_when_restricted(self):  assert "roscf true"         in self._make(restricted=True).lower()
     def test_no_roscf_unrestricted(self):  assert "roscf"          not in self._make(restricted=False).lower()
     def test_mp3_section_when_requested(self):
@@ -335,7 +335,6 @@ class TestEcpByAtomLabel:
 
     @pytest.mark.parametrize("labels", [["Ag", "H"], ["Ag1", "H2"]])
     def test_heavy_atom_gets_the_family_of_the_basis(self, labels):
-        from pyscf import gto
         from pyscf.gto import basis as B
         from pyscf_dft import get_ecp
         mol = self._mol(labels)

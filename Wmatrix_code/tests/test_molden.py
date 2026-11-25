@@ -5,8 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import pytest
 from conftest import MOLDEN_VARIANTS, Variant
-from pyscf_w_matrices import W2_LABELS, W3_LABELS
-from workflow_common import ResultFileKey
+from workflow_common import W2_LABELS, W3_LABELS, ResultFileKey
 
 ETOL = 1e-6
 

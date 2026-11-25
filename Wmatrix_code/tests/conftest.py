@@ -6,10 +6,11 @@ them and the parameter lists below are filtered from it.
 
 The ``run`` fixture does one Q-Chem SCF per (molecule, functional,
 restricted, basis), which is that base variant's run, and restarts every
-other variant of it from that Molden with ``--source molden``.  Without Q-Chem on PATH the SCF is done by PySCF
-instead, and the ``qchem`` tests are skipped.  Ag+ always takes its SCF from
-PySCF: its Q-Chem references use the Basis Set Exchange basis and ECP as
-explicit blocks, which the workflow's Q-Chem input does not carry.
+other variant of it from that Molden with ``--source molden``.  Without
+Q-Chem on PATH the SCF is done by PySCF instead, and the ``qchem`` tests
+are skipped.  Ag+ always takes its SCF from PySCF: its Q-Chem references
+use the Basis Set Exchange basis and ECP as explicit blocks, which the
+workflow's Q-Chem input does not carry.
 
 A closed-shell variant must reproduce its unrestricted twin (the same
 Variant with closed_shell=False); this checks the closed-shell code,
@@ -306,11 +307,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--etol", default=ETOL, type=float,
         help=f"Energy tolerance in Hartree (default: {ETOL})",
     )
-
-
-def pytest_configure(config: pytest.Config) -> None:
-    config.addinivalue_line("markers", "qchem: requires qchem on PATH")
-    config.addinivalue_line("markers", "reference: compares against Q-Chem reference JSON")
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
