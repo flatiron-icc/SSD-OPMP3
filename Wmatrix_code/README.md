@@ -101,21 +101,22 @@ e2 = sum(tr(f"W2{s}_{t}") for s in ("alpha", "beta") for t in ("ss", "os"))
 
 **7.3 Electric field.** `--electric-field` adds E·r to the one-electron Hamiltonian and −Σ_A Z_A E·R_A to the nuclear repulsion, both about the origin, so E(F) = E₀ − μ·F − ½ F·α·F. The field enters the SCF and the Fock matrix of step 2, and so the W matrices only through the semicanonical orbitals and orbital energies. `molden-direct` does not reoptimize the orbitals, so its file must come from a calculation in the same field. Q-Chem's `$multipole_field` has the opposite sign; `qchem` mode writes the sign-flipped components, so give the field as it should act.
 
-**7.4 PySCF internals.** The CC object is the one `pyscf.cc.CCSD` builds for the reference (restricted with `--closed-shell`, unrestricted otherwise, density-fitted with `--df`). Its integrals, c⁽¹⁾ and the ⟨ab‖cd⟩ term are computed by PySCF, with PySCF's Fock matrix replaced by diag(ε). The other terms are adapted from `update_amps` of PySCF 2.15.1 (`pyscf/cc/ccsd.py`, `uccsd.py`). `mp3.py` uses non-public parts of `pyscf.cc`: rerun the tests after upgrading PySCF.
+**7.4 PySCF internals.** The CC object is the one `pyscf.cc.CCSD` builds for the reference (restricted with `--closed-shell`, unrestricted otherwise, density-fitted with `--df`). c⁽¹⁾, the ⟨ab‖cd⟩ term and the integrals are computed by PySCF, with PySCF's Fock matrix replaced by diag(ε). The integrals are PySCF's DF-CCSD ones with `--df`; otherwise only the blocks the update reads are built (oooo, ovov, oovv, ovvo of each spin case), by PySCF's out-of-core transformation, and the ⟨ab‖cd⟩ term is AO-direct (PySCF's direct CCSD, no vvvv integrals) when its buffers fit in what is left of `--memory`, or in PySCF's minimum CC buffer (2000 MB by default) if less is left (§7.5); if not, it reads vvvv integrals. `mp3.VVVV_DIRECT` forces either; both agree to rounding (§8). The other terms are adapted from `update_amps` of PySCF 2.15.1 (`pyscf/cc/ccsd.py`, `uccsd.py`). `mp3.py` uses non-public parts of `pyscf.cc`: rerun the tests after upgrading PySCF.
 
-**7.5 Memory.** `--memory` is PySCF's `max_memory`. The W stage stores its integrals as a PySCF CCSD run does: in memory when they fit, otherwise in scratch HDF5 files (in PySCF's `TMPDIR`). The closed-shell update and W assembly work in blocks of virtual orbitals sized from `--memory`, as PySCF's RCCSD does; the unrestricted update, like PySCF's UCCSD, holds whole integral blocks.
+**7.5 Memory.** `--memory` is PySCF's `max_memory`. Without `--df`, the W stage keeps its integral blocks, and the vvvv integrals when the ⟨ab‖cd⟩ term is not AO-direct, in a scratch HDF5 file in PySCF's `TMPDIR` (set `TMPDIR` to a disk with room; the file is deleted after the stage), and the AO-direct term needs about four nao × nao matrices per occupied pair in memory. With `--df`, the integrals are stored as a PySCF DF-CCSD run does. The closed-shell update and W assembly work in blocks of virtual orbitals sized from `--memory`, as PySCF's RCCSD does; the unrestricted update, like PySCF's UCCSD, holds whole integral blocks.
 
 ## 8. Tests
 
-`pytest tests/` from this directory: 3076 tests; those marked `qchem` are skipped when Q-Chem is not on `PATH`. The suite runs H, He, H₂O, CN, CH₂, CH₃ and HCO in cc-pVDZ, triplet He (two α electrons, no β; cc-pVTZ, since in cc-pVDZ its MP2 and MP3 energies vanish), and the Ag⁺ cation in def2-SVP and cc-pVDZ-PP with their 28-electron ECPs (its SCF always by PySCF), with HF and PBE0 references, unrestricted, restricted open-shell and closed-shell, with frozen core, density fitting and a field, and checks:
+`pytest tests/` from this directory: 3096 tests; those marked `qchem` are skipped when Q-Chem is not on `PATH`. The suite runs H, He, H₂O, CN, CH₂, CH₃ and HCO in cc-pVDZ, triplet He (two α electrons, no β; cc-pVTZ, since in cc-pVDZ its MP2 and MP3 energies vanish), and the Ag⁺ cation in def2-SVP and cc-pVDZ-PP with their 28-electron ECPs (its SCF always by PySCF), with HF and PBE0 references, unrestricted, restricted open-shell and closed-shell, with frozen core, density fitting and a field, and checks:
 
 - E_HF, E_S⁽²⁾ and Tr W⁽²⁾ to 1e-5 Eh, and Tr W⁽³⁾ to 1e-4 Eh, against Q-Chem MP2 and MP3 (`tests/data/references/`);
 - for one variant of each code path, the singular values and trace of each of the eight W blocks and the OP-MP3, SOP-MP3 and SSD-OPMP3 energies to 1e-10 Eh against an independent spin-orbital evaluation of Eqs. 7, 9 and 11a from the run's own orbitals (`tests/reference_w.py`); W elements depend on orbital phases and degenerate rotations, so only these invariants are compared;
 - each closed-shell run against its unrestricted counterpart (traces, singular values of every block, resummed energies);
-- every source mode against the run whose orbitals it reads (the same);
+- every source mode against the run whose orbitals it reads, and `qchem` against `pyscf` (traces, singular values of every block, resummed energies);
 - batch mode against single runs;
 - the output file names (inputs with dots in their names) and the x_ss reported for SSD-OPMP3;
-- the ECP that both Molden modes attach without `--basis`.
+- the ECP that both Molden modes attach without `--basis`;
+- both ⟨ab‖cd⟩ paths of §7.4 against that independent evaluation (singular values and trace of each W block), also for a spin without virtual orbitals and with every block sized from `--memory` at its minimum.
 
 Runs are written to `tests/_runs/`, which each session recreates.
 

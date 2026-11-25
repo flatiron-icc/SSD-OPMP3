@@ -8,35 +8,88 @@ c^(2) can be obtained from one CCSD iteration with only the terms linear
 in the amplitudes, starting from initial doubles amplitudes c^(1) and no singles.
 This returns c^(1) + c^(2), and costs less than one CCSD iteration.
 
-The integrals, c^(1) and the <ab||cd> term are computed by PySCF's CCSD code,
-so memory use and scratch files are similar to those of a PySCF CCSD run.
-PySCF's Fock matrix is replaced by diag(eps_p), with eps_p the semicanonical orbital
-energies.  Frozen orbitals are left out throughout.
+With density fitting, the integrals are those of PySCF's DF-CCSD.  Otherwise
+only the blocks the update reads are built (oooo, ovov, oovv and ovvo of each
+spin case), by PySCF's out-of-core transformation into a scratch HDF5 file,
+and the <ab||cd> term is AO-direct (PySCF's direct CCSD) when its buffers fit
+in the memory left of max_memory (at least PySCF's CC minimum, 2000 MB by
+default), else from vvvv integrals on disk.  c^(1) and the <ab||cd> term
+are computed by PySCF's CCSD code.  PySCF's Fock matrix is replaced by
+diag(eps_p), with eps_p the semicanonical orbital energies.  Frozen orbitals
+are left out throughout.
 """
 
 from __future__ import annotations
 
 import numpy as np
-from pyscf import lib
-from pyscf.cc.ccsd import BLKMIN
+from pyscf import ao2mo, lib
+from pyscf.cc import ccsd, uccsd
 from pyscf.lib import logger
+
+# <ab||cd> term with conventional integrals: None = AO-direct when its buffers
+# fit (make_eris), True / False force the AO-direct / stored-vvvv path
+VVVV_DIRECT = None
 
 
 def make_eris(mycc, mo_energy):
-    """PySCF's CCSD integrals, with the Fock matrix replaced by diag(eps_p).
-
-    ``mo_energy`` holds the semicanonical orbital energies eps_p of all
-    orbitals (one array, or an alpha and a beta array); frozen orbitals are
-    dropped here.
+    """The integrals of the update (module docstring), with the Fock matrix
+    diag(eps_p).  ``mo_energy`` holds the semicanonical orbital energies eps_p
+    of all orbitals (one array, or an alpha and a beta array); frozen orbitals
+    are dropped here.
     """
-    # As in PySCF's CCSD: get_e_hf stores the AO integrals in memory if they
-    # fit, and ao2mo then keeps its integrals in memory, otherwise on disk.
-    # Its energy (without the field) is replaced by the reference energy.
-    mycc.get_e_hf()
-    mycc.e_hf = mycc._scf.e_tot
-    eris = mycc.ao2mo(mycc.mo_coeff)
+    mycc.e_hf = mycc._scf.e_tot                 # the reference energy, field included
     mask = mycc.get_frozen_mask()
-    if isinstance(mask, tuple):
+    u = isinstance(mask, tuple)
+    if getattr(mycc, "with_df", None) is not None:
+        eris = mycc.ao2mo(mycc.mo_coeff)
+    else:
+        mo = tuple(c[:, m] for c, m in zip(mycc.mo_coeff, mask)) if u else mycc.mo_coeff[:, mask]
+        na, nb = mycc.nocc if u else (mycc.nocc,) * 2
+        npairs = na * (na - 1) // 2 + nb * (nb - 1) // 2 + na * nb if u else na * (na + 1) // 2
+        # memory left of max_memory, floored at PySCF's CC minimum as for its own buffers
+        free = max(ccsd.MEMORYMIN, mycc.max_memory - lib.current_memory()[0])
+        need_mb = 4.0 * npairs * mycc.mol.nao_nr() ** 2 * 8 / 1e6        # AO-direct buffers
+        mycc.direct = need_mb < free if VVVV_DIRECT is None else bool(VVVV_DIRECT)
+        eris = (uccsd if u else ccsd)._ChemistsERIs()
+        eris.mo_coeff, eris.nocc, eris.mol, eris.feri = mo, mycc.nocc, mycc.mol, lib.H5TmpFile()
+        # (i p|q r) with i occupied: attribute -> spaces of p, q, r
+        blk = {"oooo": "ooo", "oovv": "ovv", "ovov": "vov", "ovvo": "vvo"}
+        if u:
+            ma, mb = mo
+            plan = [(ma, ma, na, na, blk), (mb, mb, nb, nb, {k.upper(): v for k, v in blk.items()}),
+                    (ma, mb, na, nb, {"ooOO": "ooo", "ooVV": "ovv", "ovOV": "vov", "ovVO": "vvo"}),
+                    (mb, ma, nb, na, {"OOvv": "ovv", "OVvo": "vvo"})]
+            vvvv = [("vvvv", ma[:, na:], ma[:, na:]), ("VVVV", mb[:, nb:], mb[:, nb:]),
+                    ("vvVV", ma[:, na:], mb[:, nb:])]
+        else:
+            plan, vvvv = [(mo, mo, na, na, blk)], [("vvvv", mo[:, na:], mo[:, na:])]
+        sl = lambda x, n: slice(None, n) if x == "o" else slice(n, None)
+        dim = lambda x, n, nocc: nocc if x == "o" else n - nocc
+        for ml, mr, nl, nr, spec in plan:
+            nml, nmr = ml.shape[1], mr.shape[1]
+            out = {k: eris.feri.create_dataset(k, (nl, dim(P, nml, nl), dim(Q, nmr, nr), dim(R, nmr, nr)), "f8")
+                   for k, (P, Q, R) in spec.items()}
+            # left spin without virtuals (nl == nml, where ao2mo would also pack the (i p)
+            # pairs): its blocks only meet empty amplitudes, so they stay zero
+            if 0 < nl < nml:
+                ao2mo.general(mycc.mol, (ml[:, :nl], ml, mr, mr), eris.feri, "rows")   # ao2mo's 2000 MB default
+                pblk = max(1, int(0.1e6 * free / 8 / (1.5 * nmr ** 2)))             # p per read
+                for i in range(nl):                        # occupied row i, in chunks of p
+                    for p0, p1 in lib.prange(0, nml, pblk):
+                        row = lib.unpack_tril(eris.feri["rows"][i * nml + p0:i * nml + p1]).reshape(-1, nmr, nmr)
+                        for k, (P, Q, R) in spec.items():
+                            ps = range(nml)[sl(P, nl)]
+                            a, b = max(p0, ps.start), min(p1, ps.stop)
+                            if a < b:
+                                out[k][i, a - ps.start:b - ps.start] = row[a - p0:b - p0, sl(Q, nr), sl(R, nr)]
+                del eris.feri["rows"]
+            for k, d in out.items():
+                setattr(eris, k, d)
+        if not mycc.direct:                                # s4-packed, read by PySCF's _add_vvvv
+            for k, cl, cr in vvvv:
+                ao2mo.general(mycc.mol, (cl, cl, cr, cr), eris.feri, dataname=k)
+                setattr(eris, k, eris.feri[k])
+    if u:
         eris.mo_energy = tuple(np.asarray(e)[m] for e, m in zip(mo_energy, mask))
         eris.focka, eris.fockb = (np.diag(e) for e in eris.mo_energy)
         eris.fock = (eris.focka, eris.fockb)
@@ -136,14 +189,14 @@ def update_amps_linear_r(mycc, t2: np.ndarray, eris) -> np.ndarray:
     nocc, nvir = t2.shape[1:3]
 
     # 1/2 sum_cd <ab||cd> t_ijcd
-    t2new = mycc._add_vvvv(None, t2, eris, t2sym="jiba")
+    t2new = mycc._add_vvvv(None, t2, eris, with_ovvv=False, t2sym="jiba")   # t1 = 0
     t2new *= .5  # halved: t2new + t2new.transpose(1, 0, 3, 2) at the end
 
     woooo = np.asarray(eris.oooo).transpose(0, 2, 1, 3).copy()
 
     unit = nocc**2 * nvir * 7 + nocc**3 + nocc * nvir**2
     max_memory = max(0, mycc.max_memory - lib.current_memory()[0])
-    blksize = min(nvir, max(BLKMIN, int((max_memory * .9e6 / 8 - nocc**4) / unit)))
+    blksize = min(nvir, max(ccsd.BLKMIN, int((max_memory * .9e6 / 8 - nocc**4) / unit)))
     log.debug1("max_memory %d MB,  nocc,nvir = %d,%d  blksize = %d",
                max_memory, nocc, nvir, blksize)
 

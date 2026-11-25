@@ -10,29 +10,38 @@ and the OP-MP3, SOP-MP3 and SSD-OPMP3 energies.
   code path (U, RO, closed shell, frozen core, DF, field, empty beta block,
   ECP);
 - each closed-shell run against its unrestricted twin;
-- --source chk and molden-direct against the run whose orbitals they read;
-- the x_ss of the summary's SSD-OPMP3 energy (ssd_x_ss of the functional).
+- --source molden, chk and molden-direct against the run whose orbitals
+  they read;
+- the x_ss of the summary's SSD-OPMP3 energy (ssd_x_ss of the functional);
+- both <ab||cd> paths of mp3, AO-direct (the default when it fits) and
+  stored vvvv (the fallback), against reference_w (singular values and
+  trace of each block), including a spin without virtual orbitals, at
+  default and at minimal memory.
 """
 from __future__ import annotations
 
 import numpy as np
 import pytest
 from pyscf import df as pyscf_df
+from pyscf import dft, gto
 from pyscf.scf.chkfile import load_mol
 
 from conftest import (
     ALL_PARAMS, ALL_VARIANTS, AUXBASIS, CS_CORR_PARAMS, Variant,
     resummed_totals, singular_values, w_matrices,
 )
+import mp3
 from pyscf_dft import handle_basis_core
+from pyscf_w_matrices import run_pyscf_w_matrices
 from reference_w import independent_w, resummed
-from workflow_common import W2_LABELS, W3_LABELS, ssd_x_ss
+from semicanonicalize import semicanonicalize
+from workflow_common import W2_LABELS, W3_LABELS, derive_output_paths, ssd_x_ss
 
 LABELS = W2_LABELS + W3_LABELS
 
 REF_TOL  = 1e-10   # same orbitals: only floating-point differences
 TWIN_TOL = 1e-7    # closed shell vs unrestricted: SCF convergence (test_integration.CS_ETOL)
-SRC_TOL  = 1e-6    # restarts and Molden precision (test_sources.ETOL)
+SRC_TOL  = 1e-6    # restarts and Molden precision (test_sources.ETOL, test_molden.ETOL)
 
 _BY_ID = {v.id: v for v in ALL_VARIANTS}
 _REF_IDS = (
@@ -132,6 +141,8 @@ class TestClosedShellTwin:
 
 # The variants of test_sources; all PBE0, so molden-direct (default x_ss 0.5)
 # and the run it reads (PBE0: 0.5) evaluate SSD-OPMP3 at the same x_ss.
+# molden_run is the restart of test_molden, chk_run and direct_run those of
+# test_sources.
 _SRC_PARAMS = [
     pytest.param(Variant("h2o"), id="h2o-U"),
     pytest.param(Variant("h2o", closed_shell=True), id="h2o-CS"),
@@ -141,10 +152,11 @@ _SRC_PARAMS = [
 ]
 
 
-@pytest.mark.parametrize("mode", ["chk_run", "direct_run"])
+@pytest.mark.parametrize("mode", ["molden_run", "chk_run", "direct_run"])
 @pytest.mark.parametrize("v", _SRC_PARAMS)
 class TestSourceModes:
-    """Beyond the traces of test_sources: every block and the resummed energies."""
+    """Beyond the traces of test_molden and test_sources: every block and the
+    resummed energies."""
 
     def test_singular_values(self, v, mode, run, request):
         _, paths_base = run(v)
@@ -160,3 +172,41 @@ class TestSourceModes:
         src = resummed_totals(request.getfixturevalue(mode)(v)[0])
         for model in base:
             assert abs(src[model] - base[model]) < SRC_TOL, f"{v.id} {mode} {model}"
+
+
+_H2O = "O 0 0 0; H 0 0 0.9579; H 0.9289588892 0 -0.2336831018"      # tests/data/h2o.xyz
+_CN = "C 0 0 0; N 0 0 1.17182"                                       # tests/data/cn.xyz
+
+
+@pytest.mark.parametrize("lowmem", [False, True], ids=["memory-default", "memory-minimal"])
+@pytest.mark.parametrize("atom, basis, spin, cls, ncore", [
+    (_H2O, "cc-pvdz", 0, dft.RKS, 1), (_CN, "cc-pvdz", 1, dft.UKS, 2),
+    ("Ne 0 0 0", "sto-3g", 0, dft.RKS, 0), ("N 0 0 0; H 0 0.1 1.04", "sto-3g", 4, dft.UKS, 0),
+], ids=["h2o-closed-shell-fc", "cn-unrestricted-fc", "ne-no-virtuals", "nh-quintet-no-alpha-virtuals"])
+def test_vvvv_paths(atom, basis, spin, cls, ncore, lowmem, tmp_path, monkeypatch):
+    """Both <ab||cd> paths of mp3 (VVVV_DIRECT True and False) against
+    reference_w.independent_w: singular values and trace of each block.  In
+    STO-3G every Ne orbital, and every alpha orbital of the NH quintet, is
+    occupied.  memory-minimal: --memory 1 and PySCF's CC minimum lowered to
+    0.2 MB, so every block sized from the memory is at its smallest, and
+    the integral rows of H2O and CN are read a few orbitals at a time."""
+    if lowmem:
+        monkeypatch.setattr(mp3.ccsd, "MEMORYMIN", 0.2)
+    mol = gto.M(atom=atom, basis=basis, spin=spin, verbose=0)
+    mf = cls(mol)
+    mf.xc = "pbe0"
+    mf.kernel()
+    paths = derive_output_paths(tmp_path / "m.xyz")
+    sc = semicanonicalize(mf, tmp_path / "m.xyz", ncore=ncore, output_paths=paths)
+    pair = (lambda x: (x, x)) if sc.closed_shell else (lambda x: x)
+    ref = independent_w(mol.intor("int2e", aosym="s8"), pair(sc.mo_coeff), pair(sc.nocc),
+                        pair(sc.mo_energy), ncore)
+    for direct in (True, False):
+        monkeypatch.setattr(mp3, "VVVV_DIRECT", direct)
+        run_pyscf_w_matrices(mol, sc, tmp_path / "m.xyz", ncore, memory=1 if lowmem else 16000,
+                             output_paths=paths)
+        w = w_matrices(paths)
+        for label in LABELS:
+            np.testing.assert_allclose(singular_values(w[label]), singular_values(ref[label]), rtol=0,
+                                       atol=REF_TOL, err_msg=f"VVVV_DIRECT={direct} {label}")
+            assert abs(np.trace(w[label]) - np.trace(ref[label])) < REF_TOL, f"VVVV_DIRECT={direct} {label}"
